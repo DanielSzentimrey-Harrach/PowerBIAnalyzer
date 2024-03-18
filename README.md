@@ -17,7 +17,7 @@ PowerBIAnalyzer is a script that helps to identify unused fields (columns, calcu
 ### Python
 1. Run the script using the following command:
     ```python
-    TBD
+    python .\PowerBIAnalyzer.py "path_to_pbit_file"
     ```
 
 ## Script Logic
