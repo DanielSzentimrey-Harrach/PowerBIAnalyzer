@@ -31,6 +31,7 @@ The PowerBIAnalyzer script performs the following steps:
 
 ## Requirements
 - PowerShell 5.1 or later
+- Python 3.6 or later
 
 ## Contributing
 Contributions are welcome! If you find any issues or have suggestions for improvements, please open an issue or submit a pull request.
