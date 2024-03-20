@@ -36,6 +36,7 @@ data_model, layout = get_file_contents(template_path)
 # Create variables to store the list of columns and measures used in the report, as well as the various expressions from the files
 field_list = []
 all_config_details = ""
+all_filter_details = ""
 
 # Iterate through all tables. Only hidden tables will have an isHidden property, so filtering by its existence is acceptable
 for table in data_model['model']['tables']:
@@ -45,7 +46,6 @@ for table in data_model['model']['tables']:
             if 'isHidden' not in column or not column['isHidden']:
                 field_type = column.get('type', 'column')
                 expression = column.get('expression', '') if field_type == 'calculated' else ''
-
                 field_list.append({
                     'table': table['name'],
                     'field': column['name'],
@@ -70,6 +70,10 @@ for section in layout['sections']:
         config = json.loads(visual_container['config'])
         all_config_details += " " + json.dumps(config['singleVisual'], indent=None)
 
+        filters = json.loads(visual_container['filters'])
+        for filter in filters:
+            all_filter_details += " " + json.dumps(filter, indent=None)
+
 
 # Iterate through all fields and mark them as used if they appear anywhere in the configs
 for field in field_list:
@@ -80,16 +84,21 @@ for field in field_list:
     # FUNCTION('Table'.field)
     # "Property":  "field" <-- two spaces after the colon
     ###
-    pattern = f"{re.escape(field['table'])}[']?.{re.escape(field['field'])}[)]?\"|\"Property\":  \"{re.escape(field['field'])}\""
-    if re.search(pattern, all_config_details):
+    pattern1 = f"{re.escape(field['table'])}[']?.{re.escape(field['field'])}[)]?\"|\"Property\":  \"{re.escape(field['field'])}\""
+    ### REGEX PATTERN TO MATCH FIELD IN FILTERS
+    # "Property":  "field" <-- two spaces after the colon
+    ###
+    #pattern2 = f"\"Property\":" + "[ ]{1,2}" + "\"{re.escape(field['field'])}\""
+    pattern2 = f"\"Property\": \"{re.escape(field['field'])}\""
+    if re.search(pattern1, all_config_details) or re.search(pattern2, all_filter_details):
         field['used'] = True
 
 
 # Recursively iterate through all unused fields to see if they are used in any DAX expressions of used fields
-unused_fields_count = 0
-while True: #unused_fields_count != len([field for field in field_list if not field['used']]):
+while True:
     change_made = False
-    expressions = " ".join([field['expression'] for field in field_list if field['used']])
+    # iterate through all fields, and join all expressions into a single string. The expression attribute might be a list, so we need to join them into a single string
+    expressions = " ".join([expr['expression'] if isinstance(expr['expression'], str) else " ".join(expr['expression']) for expr in field_list if expr['used']])
     for field in [field for field in field_list if not field['used']]:
         ### REGEX PATTERN TO MATCH FIELD IN DAX EXPRESSIONS
         # Table[field]
@@ -99,7 +108,6 @@ while True: #unused_fields_count != len([field for field in field_list if not fi
         if re.search(pattern, expressions):
             field['used'] = True
             change_made = True
-    #unused_fields = [field for field in field_list if not field['used']]
     if (not change_made):
         break
 

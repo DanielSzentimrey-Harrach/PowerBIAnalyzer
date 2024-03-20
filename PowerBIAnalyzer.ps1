@@ -40,6 +40,7 @@ $layout = $layout | ConvertFrom-Json
 #create variables to store the list of columns and measures used in the report, as well as the various expressions from the files
 $fieldList = @()
 $allConfigDetails = ""
+$allFilterDetails = ""
 
 #Iterate through all tables. Only hidden tables will have an isHidden property, so filtering by its existence is acceptable
 foreach ($table in ($dataModel.model.tables | Where-Object {-not (Get-Member -InputObject $_ -Name "isHidden")})) {
@@ -80,6 +81,11 @@ foreach ($section in $layout.sections) {
     foreach ($visualContainer in $section.visualContainers) {
         $config = ConvertFrom-Json $visualContainer.config
         $allConfigDetails += " " + (ConvertTo-Json $config.singleVisual -Depth 100)
+
+        $filters = ConvertFrom-Json $visualContainer.filters
+        foreach ($filter in $filters) {
+            $allFilterDetails += " " + (ConvertTo-Json $filter -Depth 100)
+        }
     }
 }
 
@@ -92,15 +98,17 @@ foreach ($field in $fieldList) {
     # FUNCTION('Table'.field)
     # "Property":  "field" <-- two spaces after the colon
     ###
-    $pattern = "$([Regex]::Escape($field.table))[']?`.$([Regex]::Escape($field.field))[)]?`"|`"Property`":  `"$([Regex]::Escape($field.field))`""
-    if (Select-String -InputObject $allConfigDetails -Pattern $pattern) {
+    $pattern1 = "$([Regex]::Escape($field.table))[']?`.$([Regex]::Escape($field.field))[)]?`"|`"Property`":[ ]{1,2}`"$([Regex]::Escape($field.field))`""
+    ### REGEX PATTERN TO MATCH FIELD IN FILTERS
+    # "Property":  "field" <-- two spaces after the colon
+    ###
+    $pattern2 = "`"Property`":[ ]{1,2}`"$([Regex]::Escape($field.field))`""
+    if ((Select-String -InputObject $allConfigDetails -Pattern $pattern1) -or (Select-String -InputObject $allFilterDetails -Pattern $pattern2)) {
         $field.used = $true
     }
 }
 
 #recursively iterate through all unused fields to see if they are used in any DAX expressions of used fields
-#$unusedFieldCount = 0
-#while ($unusedFieldCount -ne ($fieldList | Where-Object {-not $_.used}).Count) {
 do {
     $changeMade = $false
     $expressions = ($fieldList | Where-Object {$_.used}).expression -join " "
@@ -115,7 +123,6 @@ do {
             $changeMade = $true
         }
     }
-    #$unusedFieldCount = ($fieldList | Where-Object {-not $_.used}).Count
 } while($changeMade)
 
 #print out all unused fields

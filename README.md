@@ -10,7 +10,7 @@ PowerBIAnalyzer is a script that helps to identify unused fields (columns, calcu
 ### PowerShell
 1. Run the script using the following command:
     ```powershell
-    .\PowerBIAnalyzer.ps1 -TemplatePath "path_to_pbit_file"
+    powershell .\PowerBIAnalyzer.ps1 -TemplatePath "path_to_pbit_file"
     ```
     Replace "path_to_pbit_file" with the actual path to your Power BI file.
 
@@ -25,7 +25,7 @@ The PowerBIAnalyzer script performs the following steps:
 
 1. Takes the input .pbit file, extracts it to a remporary location under the user's `%home%` directory (.pbit files are just .zip files with a different extension), reads the contents of the relevant files inside (DataModelSchema and Report\Layout), then deletes all the temporary content
 2. Extracts all the columns, calculated columns, and measures from DataModelSchema
-3. Checks all fields one by one against the relevant contents of Layout to identify fields which are directly referenced (as inputs or formatting for visuals)
+3. Checks all fields one by one against the relevant contents of Layout to identify fields which are directly referenced (as inputs, formatting for visuals, or filters)
 4. Recursively checks all the unused fields if they are used in DAX expressions anywhere in the used fields
 5. Prints out all the field references that are not used anywhere
 
