@@ -53,6 +53,15 @@ foreach ($table in ($dataModel.model.tables | Where-Object {-not (Get-Member -In
             if ($column.type -eq "calculated") {
                 $expression = $column.expression
             }
+            # for columns that are calculated based on the table definitino, add the whole definition to the expression, so any dependent columns can be identified by the Regex later on
+            elseif ($column.type -eq "calculatedTableColumn") {
+                #get the partition expression (just pick the first one, not sure when / how multiple values will be here...)
+                $expression = $table.partitions[0].source.expression
+            }
+            #adding the sortByColumn property to the expression if it exists, so columns that are only used as sort order will be identified later on with the Regex
+            if (Get-Member -InputObject $column -Name "sortByColumn") {
+                $expression += " '" + $table.name + "'[" + $column.sortByColumn + "]"
+            }
         }
         $fieldList += [PSCustomObject]@{
             table = $table.name
@@ -98,12 +107,21 @@ foreach ($field in $fieldList) {
     # FUNCTION('Table'.field)
     # "Property":  "field" <-- two spaces after the colon
     ###
-    $pattern1 = "$([Regex]::Escape($field.table))[']?`.$([Regex]::Escape($field.field))[)]?`"|`"Property`":[ ]{1,2}`"$([Regex]::Escape($field.field))`""
+    $pattern1 = "$([Regex]::Escape($field.table))[']?`.$([Regex]::Escape($field.field))[)]?`""
+    ### REGEX PATTERN TO MATCH FORMATTING FIELDS IN CONFIGS
+    #       "Entity": "Table"
+    #     }
+    # },
+    # "Property":  "field" <-- two spaces after the colon
+    ###
+    $pattern2 = "`"Entity`": {1,2}`"$([Regex]::Escape($field.table))`"$([Environment]::NewLine) *}$([Environment]::NewLine) *},$([Environment]::NewLine) *`"Property`": {1,2}`"$([Regex]::Escape($field.field))`""
     ### REGEX PATTERN TO MATCH FIELD IN FILTERS
     # "Property":  "field" <-- two spaces after the colon
     ###
-    $pattern2 = "`"Property`":[ ]{1,2}`"$([Regex]::Escape($field.field))`""
-    if ((Select-String -InputObject $allConfigDetails -Pattern $pattern1) -or (Select-String -InputObject $allFilterDetails -Pattern $pattern2)) {
+    $pattern3 = "`"Property`":[ ]{1,2}`"$([Regex]::Escape($field.field))`""
+    if ((Select-String -InputObject $allConfigDetails -Pattern $pattern1) -or 
+        (Select-String -InputObject $allConfigDetails -Pattern $pattern2) -or
+        (Select-String -InputObject $allFilterDetails -Pattern $pattern3)) {
         $field.used = $true
     }
 }
@@ -127,3 +145,5 @@ do {
 
 #print out all unused fields
 $fieldList | Where-Object {-not $_.used} | Select-Object table, field, type, used
+#print out the number of unused rows
+"`n" + ($fieldList | Where-Object {-not $_.used}).Count + " unused field(s) found"

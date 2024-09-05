@@ -45,7 +45,14 @@ for table in data_model['model']['tables']:
         for column in table['columns']:
             if 'isHidden' not in column or not column['isHidden']:
                 field_type = column.get('type', 'column')
-                expression = column.get('expression', '') if field_type == 'calculated' else ''
+                if field_type == 'calculated':
+                    expression = column.get('expression', '')
+                elif field_type == 'calculatedTableColumn':
+                    expression = column.get('expression', '')
+                else:
+                    expression = table['partitions'][0]['source']['expression']
+                if 'sortByColumn' in column:
+                    expression += f" '{table['name']}'[{column['sortByColumn']}]"
                 field_list.append({
                     'table': table['name'],
                     'field': column['name'],
@@ -84,15 +91,21 @@ for field in field_list:
     # FUNCTION('Table'.field)
     # "Property":  "field" <-- two spaces after the colon
     ###
-    pattern1 = f"{re.escape(field['table'])}[']?.{re.escape(field['field'])}[)]?\"|\"Property\":  \"{re.escape(field['field'])}\""
+    pattern1 = f"{re.escape(field['table'])}[']?.{re.escape(field['field'])}[)]?\""
+    ### REGEX PATTERN TO MATCH FORMATTING FIELDS IN CONFIGS
+    #       "Entity": "Table"
+    #     }
+    # },
+    # "Property":  "field" <-- two spaces after the colon
+    ###
+    pattern2 = f"\"Entity\": \"{re.escape(field['table'])}\" *}} *}}, *\"Property\": \"{re.escape(field['field'])}\""
     ### REGEX PATTERN TO MATCH FIELD IN FILTERS
     # "Property":  "field" <-- two spaces after the colon
     ###
     #pattern2 = f"\"Property\":" + "[ ]{1,2}" + "\"{re.escape(field['field'])}\""
-    pattern2 = f"\"Property\": \"{re.escape(field['field'])}\""
-    if re.search(pattern1, all_config_details) or re.search(pattern2, all_filter_details):
+    pattern3 = f"\"Property\": \"{re.escape(field['field'])}\""
+    if re.search(pattern1, all_config_details) or re.search(pattern2, all_config_details) or re.search(pattern3, all_filter_details):
         field['used'] = True
-
 
 # Recursively iterate through all unused fields to see if they are used in any DAX expressions of used fields
 while True:
@@ -114,5 +127,7 @@ while True:
 # Print out all unused fields
 unused_fields = [field for field in field_list if not field['used']]
 table = [[field['table'], field['field'], field['type'], field['used']] for field in unused_fields]
-
 print(tabulate(table, headers=["Table", "Field", "Type", "Used"]))
+
+# print out the number of unused fields
+print(f"{len(unused_fields)} unused field(s) found")
